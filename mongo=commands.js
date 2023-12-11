@@ -100,7 +100,7 @@ db.products.insertMany([
   )
 
 //collection read
-db.products.find().pretty()
+db.products.find().pretty().limit(5)
 
 //fine one
 db.products.findOne({name:" iPhone 15 (128 GB)"})
@@ -122,3 +122,206 @@ db.products.find({},{name:0 , price:1}).pretty()
 
 //Exclude '_id'
 db.products.find({},{_id:0, name:1 , price:1}).pretty() 
+
+//limit
+db.collection.find({
+  product_price: {
+    "$gt": 500
+  }
+}).limit(5)
+
+//remove
+db.collection.remove({ 
+  "$expr": {
+      "$in": ["product_price"]
+  }
+})
+
+//distinct
+db.products.distinct("rating")
+
+//filter duplicate and remove
+let prices = db.collection.aggregate([
+  {
+    "$group": {
+      "_id": "$product_price",
+      "count": {
+        "$sum": 1
+      }
+    }
+  },
+  {
+    "$match": {
+      "_id": {
+        "$ne": null
+      },
+      "count": {
+        "$gt": 1
+      }
+    }
+  },
+  {
+    "$project": {
+      "product_price": "$_id",
+      "_id": 0
+    }
+  }
+])
+
+prices.forEach(price => {
+  db.collection.remove( { product_price: { "$eq": price } } )
+});
+
+
+//sorting 
+//asc=1
+db.products.find({}).sort({rating:1}).pretty()
+
+//desc=-1 //top 5
+db.products.find({}).sort({rating:-1}).pretty().limit(5)
+//sorting 2 fields // last 5
+db.products.find({}).sort({name:1,rating:-1}).skip(5).pretty()
+
+//aggregation
+
+db.orders.insertMany(
+  [
+    {_id:0,productName:"Steel Beam", status:"new",quantity:10},
+    {_id:1,productName:"Steel Beam", status:"Urgent",quantity:20},
+    {_id:2,productName:"Steel Beam", status:"Urgent",quantity:30},
+    {_id:3,productName:"Iron Rod", status:"new",quantity:15},
+    {_id:4,productName:"Iron Rod", status:"Urgent",quantity:50},
+    {_id:5,productName:"Iron Rod", status:"Urgent",quantity:10}
+  ]
+)
+
+db.orders.find().pretty()
+
+//match urgent products
+//SQL
+//select * from orders where status ="Urgent";
+
+
+//group based on product name and sum its quantity
+//SQL
+
+//filter status ="Urgent"
+db.orders.aggregate(
+  [
+    //stage 1
+    {
+      $match:{status :"Urgent"}
+    }
+  ]
+)  
+
+//select sum(quantity) from orders where status ="Urgent" group by productName;
+db.orders.aggregate(
+  [
+    //stage 1
+    {
+      $match:{status :"Urgent"}
+    },
+
+    //stage2
+    {
+      $group:{_id:"$productName",totalQuantity:{$sum:"$quantity"}}
+    }
+  ]
+)
+
+//lookups  => join
+
+db.order.insertMany(
+  [
+    {"_id":1,"item":"almonds", "price":12,"quantity":2},
+    {"_id":2,"item":"pecans", "price":20,"quantity":1},
+  ]
+)
+
+db.inventory.insertMany( [
+  { "_id" : 1, "sku" : "almonds", "description": "product 1", "instock" : 120 },
+  { "_id" : 2, "sku" : "bread", "description": "product 2", "instock" : 80 },
+  { "_id" : 3, "sku" : "cashews", "description": "product 3", "instock" : 60 },
+  { "_id" : 4, "sku" : "pecans", "description": "product 4", "instock" : 70 },
+  { "_id" : 5, "sku": null, "description": "Incomplete" },
+  { "_id" : 6 }
+] )
+
+//joining order and inventory using item and sku fields
+
+db.order.aggregate(
+  [
+    {
+      $lookup:{
+        from:"inventory", 
+        localField:"item",
+        foreignField:"sku",
+        as:"combined_data",
+      }
+    }
+  ]
+).pretty()
+
+//basic cursor methods - map, toArray, pretty, forEach, limit, count, sort
+
+//pointer
+var myCursor=db.orders.find({_id:5}).pretty()
+
+//next() - to create next set of data
+
+var myCursor=db.orders.find({_id:{$gt:3}}).pretty()
+while(myCursor.hasNext()){
+  print(tojson(myCursor.next()))
+}
+
+//foreach
+var myCursor=db.orders.find({_id:5}).pretty()
+myCursor.forEach(printjson)
+//print doc in json format
+
+var myCursor=db.orders.find().pretty()
+myCursor.forEach(function(product){
+  print(`productName ${product.productName} Qunatity ${product.quantity}`)
+})
+
+//urgent prod
+
+var myCursor=db.orders.find({status:"Urgent"}).pretty()
+myCursor.forEach(function(urgentOrder){
+  print(`Order ID: ${urgentOrder._id}, Product Name: ${urgentOrder.productName}, status: ${urgentOrder.status}`)
+})
+
+//count
+db.orders.find().count()
+db.orders.countDocuments()
+db.orders.estimatedDocumentCount()
+
+//toArray() => used to convert documents to array
+var allOrders = db.orders.find().toArray()
+allOrders.forEach(function(order){
+  print(`Order ID : ${order._id}, Product Name: ${order.productName}`)
+})
+
+//map()
+var listProductName = db.orders.find().map(function(data){
+  return data.productName
+})
+
+
+var listProductName = db.orders.find().map(function(data){
+  return data.quantity*100
+})
+
+//mapreduce function together
+
+//defining map function => always emits(returns) key and value pair
+var mapFunc = function(){
+  emit(this.productName,this.quantity)
+}
+
+//defining reduce function
+var reduceFunc = function(key,values){
+  return Array.sum(values)
+}
+

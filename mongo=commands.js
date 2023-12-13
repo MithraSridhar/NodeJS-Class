@@ -263,6 +263,27 @@ db.order.aggregate(
   ]
 ).pretty()
 
+//update all products with category as electronics
+//updates all documents
+db.products.updateMany({},{$set:{category:"electronics"}})
+
+//update only first occurrence alone
+db.products.updateOne({category:"electronics"},{$set:{category:"mobile"}})
+
+//delete all products where rating >4.9
+db.products.find({rating:{$gt:4.9}}).pretty()
+
+db.products.deleteMany({rating:{$gt:4.9}})
+
+db.products.find({rating:{$gte:4.9}}).pretty()
+
+db.products.deleteOne({rating:{$gte:4.9}})
+
+
+
+
+
+
 //basic cursor methods - map, toArray, pretty, forEach, limit, count, sort
 
 //pointer
@@ -324,4 +345,14 @@ var mapFunc = function(){
 var reduceFunc = function(key,values){
   return Array.sum(values)
 }
+
+//combining map and reduce
+var result=db.orders.mapReduce(
+  mapFunc,
+  reduceFunc,
+  {out:"totalQuantity"} //specifying the collection
+)
+db.totalQuantity.find().forEach(printjson)
+
+
 
